@@ -1,0 +1,6 @@
+Dataset,Type of ML Task,Feature Selection Technique,Suitable ML Algorithm
+Iris Dataset,Supervised - Multiclass Classification,"ANOVA F-test (SelectKBest, f_classif)",Logistic Regression / SVM / Decision Tree
+Loan Amount Prediction,Supervised - Regression,Correlation / SelectKBest (f_regression),Linear Regression / Random Forest Regressor
+Predicting Diabetes,Supervised - Regression,SelectKBest (f_regression),Ridge / Linear Regression / Gradient Boosting Regressor
+Email Spam Classification,Supervised - Binary Classification (Text/NLP),Chi-square test (chi2) on TF-IDF features,Multinomial Naive Bayes / Logistic Regression / SVM
+Handwritten Character Recognition / MNIST,Supervised - Multiclass Classification (Image),Variance Threshold + PCA,SVM (RBF) / Random Forest / CNN (deep learning)

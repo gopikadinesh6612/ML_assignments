@@ -1,0 +1,7 @@
+,GridSearchCV,RandomizedSearchCV
+Best k,3,5
+Metric,f1,f1
+Weights,uniform,uniform
+Algorithm,kd_tree,kd_tree
+CV Accuracy,0.9354,0.9345
+Execution Time (s),23.76,11.047
