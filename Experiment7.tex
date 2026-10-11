@@ -1,0 +1,297 @@
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{longtable}
+
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{ICS1512}
+\rhead{Machine Learning Laboratory}
+\cfoot{\thepage}
+
+\lstset{
+language=Python,
+basicstyle=\ttfamily\small,
+numbers=left,
+frame=single,
+breaklines=true,
+showstringspaces=false
+}
+
+\begin{document}
+
+\begin{tabular}{|p{4cm}|p{11cm}|}
+\hline
+Experiment No. & 6 \\ \hline
+Experiment Title & Dimensionality Reduction and Model Evaluation (With and Without PCA)
+\footnote{\textbf{GitHub Repository: }\url{https://github.com/gopikadinesh6612/ML_assignments.git}}\\ \hline
+Student Name & Amilineni Gopika \\ \hline
+Register Number & 3122247001003 \\ \hline
+Faculty & Dr. Poreddy Ajay Kumar Reddy \\ \hline
+Submission Date & 20/09/26 \\ \hline
+\end{tabular}
+
+\section{Objective}
+To study the effect of dimensionality reduction using Principal Component Analysis (PCA) on
+the performance of ten machine learning classifiers, by training and validating each model
+both without PCA (original feature space) and with PCA (reduced feature space), performing
+hyperparameter tuning and 5-fold cross-validation in both settings.
+
+\section{Problem Statement}
+Given the Wisconsin Diagnostic Breast Cancer dataset of 30 numerical features, many of which
+are highly correlated (mean/worst/standard-error versions of the same 10 underlying cell
+measurements), the problem is to determine whether compressing this feature space with PCA
+improves, degrades, or leaves unchanged the accuracy, F1-score, and cross-validation
+stability of ten different classifiers -- spanning linear, distance-based, probabilistic,
+tree-based, and ensemble model families.
+
+\section{Dataset Description}
+\begin{longtable}{|p{6cm}|p{8cm}|}
+\hline
+Dataset Name & Wisconsin Diagnostic Breast Cancer (WDBC) \\ \hline
+Dataset Source & UCI Machine Learning Repository -- \url{https://archive.ics.uci.edu} (loaded via \texttt{sklearn.datasets.load\_breast\_cancer}) \\ \hline
+Number of Samples & 569 \\ \hline
+Number of Features & 30 numerical attributes (mean, standard error, and ``worst'' value of 10 cell-nucleus measurements) \\ \hline
+Number of Classes & 2 (357 benign / 212 malignant) \\ \hline
+Missing Values & 0 \\ \hline
+Train-Test Split & 80:20 stratified (455 train / 114 test), \texttt{random\_state=42} \\ \hline
+\end{longtable}
+
+\textbf{Preprocessing steps:} Label encoding was not required (target is already numeric,
+0=malignant, 1=benign). No missing values were present. All 30 features were standardized
+(\texttt{StandardScaler}, zero mean, unit variance, fit on the training split only) before
+both the No-PCA and With-PCA branches, since several of the evaluated models (SVM, KNN,
+Logistic Regression) and PCA itself are scale-sensitive.
+
+\textbf{Note on XGBoost:} The training environment for this experiment does not have network
+access to install the third-party \texttt{xgboost} package. As a substitute, scikit-learn's
+built-in \texttt{HistGradientBoostingClassifier} was used -- a histogram-based gradient
+boosting implementation from the same algorithmic family as XGBoost/LightGBM, offering a
+comparable accuracy/speed profile. This substitution is noted throughout as ``XGBoost
+(HistGB)''.
+
+\section{PCA Design Choice}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{pca_scree_plot.png}
+\caption{PCA scree plot -- cumulative explained variance vs. number of components}
+\end{figure}
+
+\begin{longtable}{|p{4cm}|p{4cm}|p{3cm}|p{4cm}|}
+\hline
+\textbf{Setting} & \textbf{Chosen Components / Variance Target} & \textbf{Explained Variance (\%)} & \textbf{Justification} \\ \hline
+\endhead
+With-PCA & 95\% cumulative variance target $\rightarrow$ 10 components & 95.27\% & A 95\% variance retention threshold is a standard default that keeps almost all discriminative information while still compressing 30 raw features into just 10 principal components (a 3$\times$ reduction) -- justified further by the scree plot's visible ``elbow'' flattening after roughly 6--10 components, beyond which each additional component contributes very little further variance. \\ \hline
+\end{longtable}
+\textbf{Inference:} 10 of 30 components already capture over 95\% of total variance,
+confirming the strong inter-feature correlation observed in the EDA correlation heatmap of
+earlier experiments on this dataset (mean/worst/error versions of the same measurement are,
+unsurprisingly, highly redundant) -- exactly the situation where PCA is expected to be most
+effective at compressing without much information loss.
+
+\section{Exploratory Data Analysis}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\linewidth]{class_distribution.png}
+\caption{Class distribution -- Breast Cancer Wisconsin (Diagnostic)}
+\end{figure}
+\textbf{Inference:} The dataset is mildly imbalanced (357 benign vs. 212 malignant, about
+63:37), consistent across all experiments conducted on this dataset. No missing-value
+visualization is required since there are zero missing values.
+
+\section{Hyperparameter Grids}
+\begin{longtable}{|p{3.3cm}|p{10.5cm}|}
+\hline
+\textbf{Model} & \textbf{Grid Searched (identical for No-PCA and With-PCA)} \\ \hline
+\endhead
+SVM & kernel $\in$ \{linear\} $\times$ C $\in$ \{0.1,1,10\}; kernel $\in$ \{rbf\} $\times$ C $\in$ \{0.1,1,10\} $\times$ $\gamma \in$ \{scale,auto\} \\ \hline
+Naive Bayes & var\_smoothing $\in \{10^{-9}, 10^{-8}, 10^{-7}, 10^{-6}\}$ \\ \hline
+KNN & n\_neighbors $\in \{3,5,7,9,11\}$, weights $\in$ \{uniform, distance\}, metric $\in$ \{euclidean, manhattan\} \\ \hline
+Logistic Regression & C $\in \{0.01,0.1,1,10,100\}$, penalty=L2, solver=liblinear \\ \hline
+Decision Tree & max\_depth $\in \{3,5,7,None\}$, min\_samples\_leaf $\in \{1,2,4\}$ \\ \hline
+Random Forest & n\_estimators $\in \{50,100,200\}$, max\_depth $\in \{5,10,None\}$ \\ \hline
+AdaBoost & n\_estimators $\in \{50,100,200\}$, learning\_rate $\in \{0.1,0.5,1.0\}$ \\ \hline
+Gradient Boosting & n\_estimators $\in \{100,200\}$, learning\_rate $\in \{0.05,0.1\}$, max\_depth $\in \{2,3\}$ \\ \hline
+XGBoost (HistGB) & max\_iter $\in \{100,200\}$, learning\_rate $\in \{0.05,0.1\}$, max\_depth $\in \{3,5\}$ \\ \hline
+Stacking & Base models fixed (SVM, Gaussian NB, Decision Tree) $\rightarrow$ Logistic Regression meta-learner; ``hyperparameter'' here is the base-model choice itself, per the assignment's own framing \\ \hline
+\end{longtable}
+All grids were searched via \texttt{GridSearchCV} with 5-fold \texttt{StratifiedKFold}
+(\texttt{shuffle=True, random\_state=42}), optimizing accuracy, run identically on both the
+standardized original 30-feature space (No-PCA) and the 10-component PCA-reduced space
+(With-PCA), with a fresh unfitted estimator instance per setting.
+
+\section{5-Fold Cross-Validation Results (No-PCA vs. With-PCA)}
+
+\begin{longtable}{|p{3.3cm}|p{2.3cm}|p{2.3cm}|p{2.1cm}|p{2.1cm}|}
+\hline
+\textbf{Model} & \textbf{Best Params (No-PCA)} & \textbf{Best Params (With-PCA)} & \textbf{Avg CV Acc (No-PCA)} & \textbf{Avg CV Acc (With-PCA)} \\ \hline
+\endhead
+SVM & linear, C=0.1 & linear, C=1 & 0.9758 & \textbf{0.9780} \\ \hline
+Naive Bayes & smoothing=1e-9 & smoothing=1e-9 & \textbf{0.9341} & 0.9165 \\ \hline
+KNN & manhattan, k=3, uniform & euclidean, k=5, uniform & \textbf{0.9714} & 0.9648 \\ \hline
+Logistic Regression & C=1, L2 & C=1, L2 & 0.9802 & \textbf{0.9824} \\ \hline
+Decision Tree & depth=5, leaf=4 & depth=5, leaf=1 & \textbf{0.9385} & 0.9231 \\ \hline
+Random Forest & depth=10, n=100 & depth=None, n=200 & \textbf{0.9626} & 0.9604 \\ \hline
+AdaBoost & lr=1.0, n=100 & lr=0.5, n=100 & \textbf{0.9802} & 0.9648 \\ \hline
+Gradient Boosting & lr=0.1, depth=2, n=200 & lr=0.1, depth=3, n=200 & \textbf{0.9670} & 0.9626 \\ \hline
+XGBoost (HistGB) & lr=0.05, depth=3, iter=200 & lr=0.1, depth=3, iter=100 & \textbf{0.9714} & 0.9692 \\ \hline
+Stacking & SVM+NB+DT $\to$ LogReg & SVM+NB+DT $\to$ LogReg & 0.9648 & \textbf{0.9670} \\ \hline
+\end{longtable}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{no_pca_vs_pca_comparison.png}
+\caption{5-fold CV accuracy comparison: No-PCA vs. With-PCA, all 10 models}
+\end{figure}
+\textbf{Inference:} PCA \emph{improved} average CV accuracy for exactly three models -- SVM
+(+0.22pp), Logistic Regression (+0.22pp), and Stacking (+0.22pp) -- and \emph{reduced} it for
+the other seven, most sharply for Naive Bayes ($-$1.76pp) and Decision Tree ($-$1.54pp). The
+pattern is not random: PCA helped or was neutral for every linear/margin-based model and the
+meta-learned Stacking ensemble, while it hurt every purely tree-based model (Decision Tree,
+Random Forest, AdaBoost, Gradient Boosting, XGBoost) to some degree.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{stability_comparison.png}
+\caption{5-fold CV standard deviation (stability) comparison: No-PCA vs. With-PCA}
+\end{figure}
+\textbf{Inference:} Stability results are mixed rather than uniformly favouring either
+setting. Logistic Regression, Naive Bayes, and Stacking became \emph{more} stable
+(lower fold-to-fold std) with PCA, while Decision Tree, Gradient Boosting, and XGBoost
+became \emph{less} stable -- for the tree-based models, this makes sense: PCA components are
+linear combinations of all 30 original features, which removes the natural
+axis-aligned split boundaries trees rely on, making individual tree structure (and hence
+fold-to-fold variance) more sensitive to exactly which samples land in each fold.
+
+\section{Test Set Performance (Selected Models)}
+\begin{longtable}{|p{3.3cm}|p{1.6cm}|p{1.6cm}|p{1.7cm}|p{1.7cm}|}
+\hline
+\textbf{Model} & \textbf{Acc (No-PCA)} & \textbf{Acc (PCA)} & \textbf{F1 (No-PCA)} & \textbf{F1 (PCA)} \\ \hline
+\endhead
+SVM & \textbf{0.9825} & 0.9649 & \textbf{0.9861} & 0.9718 \\ \hline
+Logistic Regression & \textbf{0.9825} & 0.9649 & \textbf{0.9861} & 0.9718 \\ \hline
+Random Forest & \textbf{0.9561} & 0.9386 & \textbf{0.9655} & 0.9510 \\ \hline
+Stacking & 0.9649 & 0.9649 & 0.9726 & 0.9722 \\ \hline
+\end{longtable}
+\textbf{Note:} On this single 114-row held-out test split, No-PCA edges out or ties With-PCA
+for every selected model -- worth noting as a contrast with the CV table above, where SVM and
+Logistic Regression's \emph{cross-validated} average was actually slightly higher with PCA.
+This is the same single-split-vs-CV-average discrepancy observed in earlier experiments on
+this dataset, and is why Section 6's 5-fold CV table, not this single split, is the primary
+basis for the conclusions in Section 10.
+
+\section{Result Visualization}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{confusion_matrices_selected.png}
+\caption{Confusion matrices for selected models -- top row: No-PCA, bottom row: With-PCA}
+\end{figure}
+\textbf{Inference:} SVM and Logistic Regression show slightly more errors under PCA than
+without it on this test split (consistent with Section 7's test-accuracy dip), while
+Stacking's error pattern is nearly identical in both settings -- the meta-learner appears to
+compensate for whatever information the compression removes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\linewidth]{roc_curves_no_pca.png}
+\includegraphics[width=0.48\linewidth]{roc_curves_with_pca.png}
+\caption{ROC curves for selected models -- No-PCA (left) vs. With-PCA (right)}
+\end{figure}
+\textbf{Inference:} AUC values remain very high ($>$0.97) for every selected model in both
+settings, and the relative ranking of models is largely preserved -- PCA does not
+qualitatively change which model ranks predictions best, even where it shifts the exact
+accuracy/F1 numbers at the default 0.5 threshold.
+
+\section{Observation Questions}
+\begin{enumerate}
+\item \textbf{Which models improved most with PCA? Which did not? Why?} SVM, Logistic
+Regression, and Stacking improved slightly (all +0.22pp CV accuracy). Naive Bayes ($-$1.76pp)
+and Decision Tree ($-$1.54pp) degraded most. Linear/margin-based models improved because PCA
+components are orthogonal linear combinations that can slightly reduce multicollinearity-related
+noise in the decision boundary; Naive Bayes degraded because it assumes (conditional)
+feature independence, and while PCA components are uncorrelated, GaussianNB's per-feature
+variance estimates on rotated, mixed components no longer align with the natural boundaries of
+the original measurements; Decision Tree degraded because PCA components lose the
+directly-interpretable, axis-aligned thresholds (e.g. ``worst radius $\le$ 16.8'') that trees
+split on naturally.
+\item \textbf{Did PCA reduce variance across folds (more stable results)?} Only for some
+models -- Logistic Regression, Naive Bayes, and Stacking became more stable, but Decision
+Tree, Gradient Boosting, and XGBoost became \emph{less} stable (higher fold std), and SVM,
+KNN, Random Forest, and AdaBoost were roughly unchanged. PCA does not uniformly stabilize
+cross-validation; its effect on stability depends on how well the model family's inductive
+bias matches rotated, mixed features versus original, individually meaningful ones.
+\item \textbf{For high-dimensional data, was PCA beneficial in reducing overfitting?} This
+30-feature dataset is only mildly high-dimensional relative to its 455 training rows, and the
+results suggest PCA's overfitting-reduction benefit here was modest at best: tree-based
+ensembles (which are naturally somewhat overfitting-resistant already, per Experiment 5/7's
+findings) did not benefit and mostly got worse, while only the already low-variance linear
+models saw a (small) improvement. PCA would likely show a clearer overfitting-reduction
+benefit on datasets with a much higher feature-to-sample ratio than this one.
+\item \textbf{How did linear models behave compared to ensemble models with PCA?} Linear
+models (Logistic Regression, SVM) were the most PCA-friendly family in this experiment --
+both improved slightly under PCA. Ensemble models (Random Forest, AdaBoost, Gradient
+Boosting, XGBoost) were uniformly PCA-averse, each losing between 0.2 and 1.5 percentage
+points of CV accuracy. This is a clean, consistent split along model family lines, not
+scattered across both groups.
+\item \textbf{Did stacking show robustness to dimensionality reduction compared to single
+models?} Yes -- Stacking was one of only three models that improved under PCA (+0.22pp), and
+its test-set F1 (0.9726 vs. 0.9722) was nearly unchanged between settings, the smallest
+No-PCA/PCA gap of any model in Section 8's table. Combining a linear-friendly base learner
+(SVM), a rotation-sensitive one (Naive Bayes), and a rotation-averse one (Decision Tree)
+appears to let the meta-learner average out each base learner's individual sensitivity to the
+feature transformation, producing the most dimensionality-reduction-robust result of any
+model tested.
+\end{enumerate}
+
+\section{Discussion}
+This experiment shows that PCA's effect is not a uniform "helps" or "hurts" verdict but
+depends strongly on model family. The clean split -- linear/margin-based models and Stacking
+benefiting, every tree-based model degrading -- is explainable directly from each family's
+inductive bias: trees rely on axis-aligned, individually-meaningful feature thresholds that
+PCA's rotation destroys, while linear models only need a good separating hyperplane, which
+orthogonal, decorrelated components can provide just as well (or slightly better) than the
+original correlated features. The magnitude of every effect observed here is small (all
+changes under 2 percentage points), consistent with this dataset's relatively modest
+dimensionality (30 features, 455 training rows) -- PCA's practical value would likely be much
+larger on genuinely high-dimensional data (hundreds or thousands of features) where variance
+reduction from compression matters more, or where training time reduction (fewer input
+dimensions) is itself a practical goal, which was not directly measured in this experiment's
+tuning-time comparisons but would be a natural extension.
+
+\section{Conclusion}
+For the Wisconsin Diagnostic Breast Cancer dataset, PCA at a 95\% variance target (compressing
+30 features to 10 components) produced small, model-family-dependent effects rather than a
+uniform improvement or degradation. \textbf{PCA is beneficial} for linear/margin-based models
+(SVM, Logistic Regression) and for the heterogeneous Stacked Ensemble, and \textbf{PCA is not
+beneficial} for tree-based models (Decision Tree, Random Forest, AdaBoost, Gradient Boosting,
+XGBoost), each of which relies on original, axis-aligned feature thresholds that PCA's
+rotation removes. The overall best-performing model in this experiment, SVM (linear kernel),
+achieved its best cross-validated accuracy \emph{with} PCA (0.9780) even though its single
+test-split accuracy was marginally higher without it -- reinforcing that hyperparameter and
+preprocessing decisions should be validated by cross-validation, not a single train-test
+split. The practical recommendation from this experiment is to apply PCA selectively based on
+the downstream model family, rather than as a blanket preprocessing step.
+
+\section{References}
+\begin{enumerate}[label={[\arabic*]}]
+\item Scikit-learn Documentation, ``PCA,'' \url{https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html}
+\item Scikit-learn Documentation, ``Ensemble Methods,'' \url{https://scikit-learn.org/stable/modules/ensemble.html}
+\item Scikit-learn Documentation, ``HistGradientBoostingClassifier,'' \url{https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.HistGradientBoostingClassifier.html}
+\item UCI Machine Learning Repository, ``Breast Cancer Wisconsin (Diagnostic) Data Set,'' \url{https://archive.ics.uci.edu}
+\end{enumerate}
+
+\end{document}
